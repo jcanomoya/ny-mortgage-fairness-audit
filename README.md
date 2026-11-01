@@ -1,108 +1,106 @@
-# HMDA New York 2024: Algorithmic Fairness Audit for Mortgage Credit Risk
+# HMDA-NY Credit Model Audit: Bias, Explainability and Mitigation
+
+![Python](https://img.shields.io/badge/Python-3.x-3776AB?logo=python&logoColor=white)
+![LightGBM](https://img.shields.io/badge/LightGBM-model-2ecc71)
+![Fairlearn](https://img.shields.io/badge/Fairlearn-mitigation-e67e22)
+![SHAP](https://img.shields.io/badge/SHAP-explainability-e74c3c)
 
 ## Business Objective
 
-Automated credit decisioning is only as valuable as it is defensible. Lenders increasingly rely on machine learning to assess mortgage applications at scale, but a model that predicts defaults or approvals accurately can still systematically disadvantage protected groups, exposing the institution to regulatory action, reputational damage and unfair outcomes for applicants.
-
-This project builds an **automated mortgage approval model for New York State (2024)** and, critically, treats fairness as a first-class requirement rather than an afterthought. Using real federal HMDA (*Home Mortgage Disclosure Act*) data, it delivers the full cycle a bank's risk and compliance teams need: predict, audit, explain, and mitigate. The goal is a credit-risk assessment that supports **anti-discrimination compliance** (such as ECOA and fair lending requirements) without discarding predictive performance.
+A mortgage approval model has to be accurate and defensible under anti-discrimination rules (ECOA, Fair Housing Act). This project trains one on real 2024 New York HMDA data and puts it through the checks a compliance team would require before deployment: where the bias comes from, how much the model uses it, how much can be removed, and what that removal costs.
 
 ---
 
 ## Strategic Value & Architecture
 
-### Why this matters for a lender
+### Experiment design
 
-* **Regulatory defensibility:** Every model is audited against sensitive attributes (`derived_race`, `derived_sex`, `derived_ethnicity`), producing evidence of how decisions differ across demographic groups.
-* **Explainability on demand:** SHAP analysis shows which features drive decisions, and whether demographic variables (or close proxies) carry weight in the model's reasoning.
-* **Measured performance/equity trade-off:** Instead of assuming fairness comes for free, the project quantifies exactly what predictive performance is traded for a fairer model, which is the question a risk committee will ask.
-* **Reproducible end to end:** Fixed seeds and a fully scripted pipeline make results auditable and repeatable.
+Three models are trained on the same split so that each isolates one effect:
 
-### Four-stage pipeline
-
-| Stage | Notebook | Purpose |
+| Model | Role in the experiment | Question it answers |
 |---|---|---|
-| **1. Data audit & preparation** | `01_EDA_Limpieza.ipynb` | Explore the data, detect demographic bias, remove data leakage, impute, scale, encode and split |
-| **2. Baseline** | `02_Modelo_Baseline.ipynb` | Logistic Regression as the reference point for both performance and fairness |
-| **3. Biased model + explainability** | `03_Modelo_Sesgado_XAI.ipynb` | Tuned ensemble models, SHAP analysis, and quantification of the unconstrained model's inherent bias |
-| **4. Bias mitigation** | `04_Modelo_Mitigado_XAI.ipynb` | Fairness-constrained retraining of the winning model and post-mitigation SHAP verification |
+| **Logistic Regression** | Linear reference | How much bias does the data carry on its own? |
+| **LightGBM, unconstrained** | Performance ceiling | What happens when a high-capacity model sees sensitive attributes? |
+| **LightGBM + `ExponentiatedGradient`** | Constrained version of the same model | What does an `EqualizedOdds` constraint change, and at what price? |
 
-**Stage details**
+```mermaid
+flowchart LR
+    A[("HMDA NY 2024<br/>383,577 × 99")] --> B["01 · Prepare<br/>leakage out · split first<br/>impute · scale"]
+    B --> C["02 · Linear reference"]
+    B --> D["03 · Ensembles + SHAP<br/>pick the winner"]
+    D --> E["04 · Constrained retraining<br/>+ SHAP re-audit"]
+    C -.-> E
+```
 
-* **`01_EDA_Limpieza.ipynb`**
-  * Initial profiling: data types, missing values, distributions
-  * Visual detection of bias across sensitive attributes (race, sex, ethnicity, age)
-  * Row and column filtering, plus removal of *data leakage*
-  * Imputation with `KNNImputer`, scaling with `RobustScaler`
-  * Encoding: `OrdinalEncoder` for ordinal variables, `OneHotEncoder` for nominal ones
-  * Stratified train/test split (`random_state=42`)
-* **`02_Modelo_Baseline.ipynb`**
-  * Logistic Regression with `class_weight='balanced'`
-  * Global performance metrics and baseline fairness metrics
-* **`03_Modelo_Sesgado_XAI.ipynb`**
-  * `GridSearchCV` comparison across Random Forest, Gradient Boosting, XGBoost and LightGBM
-  * SHAP global feature importance and audit of sensitive attributes
-  * Quantification of the winning model's bias before any intervention
-* **`04_Modelo_Mitigado_XAI.ipynb`**
-  * `ExponentiatedGradient` (Fairlearn) with an `EqualizedOdds` constraint
-  * Primary sensitive attribute: `derived_race_White`
-  * Performance vs. fairness trade-off analysis
-  * Post-mitigation SHAP to confirm demographic variables no longer drive predictions
+### Design decisions
 
-### Dataset
-
-| Attribute | Detail |
+| Decision | Reason |
 |---|---|
-| **Source** | Consumer Financial Protection Bureau (CFPB), HMDA 2024 |
-| **Coverage** | All mortgage applications in New York State during 2024 |
-| **Original size** | 383,577 records, 99 columns |
-| **Size after filtering** | ~283,000 records (only action codes 1 and 3) |
-| **Target** | `action_taken`: `1` = approved, `0` = denied |
-| **Class imbalance** | ~74% approved / ~26% denied |
-| **Sensitive attributes** | `derived_race`, `derived_sex`, `derived_ethnicity` |
+| Split **before** preprocessing | Imputer and scaler are fit on train only |
+| Drop `lei`, `census_tract` | `lei` lets the model memorize which lenders approve more; `census_tract` is high-cardinality and covered by `county_code` and census variables |
+| Remove post-decision columns (denial reasons, `interest_rate`, `rate_spread`, origination costs, `purchaser_type`) | They exist only after the decision: target leakage |
+| Keep only `action_taken` 1 and 3 | The other outcomes are not active lending decisions |
+| `RobustScaler`, `KNNImputer` (k=5), drop columns above 50% nulls | Skewed financial variables with capture errors; structural voids in the form should not be imputed |
+| Keep sensitive columns in the CSVs | Fairness groups can be rebuilt in any notebook without reprocessing |
+| `sample_weight_name='sample_weight'` and `_pmf_predict` | Needed to plug LightGBM into Fairlearn's randomized ensemble |
+| SHAP over the weighted mean of `predictors_` and `weights_` | Explains the mitigated ensemble as a whole |
 
-Features cover loan characteristics (amount, type, LTV), applicant profile (income, debt ratio) and census-tract context (minority population share, relative area income).
+**Data card:** 283,332 applications × 80 features after filtering, ~74% approved / ~26% denied, stratified 80/20 split (226,665 train / 56,667 test), `RANDOM_STATE = 42`. Sensitive attributes (`derived_race`, `derived_sex`, `derived_ethnicity`) are used for auditing only. Source: [CFPB HMDA Data Browser](https://ffiec.cfpb.gov/data-browser/data/2024?category=states&items=NY).
 
 ---
 
 ## Key Results & Metrics
 
-Every model is evaluated on two axes: **predictive performance** and **fairness**. Evaluation uses a stratified 80/20 split (226,665 training / 56,667 test applications, 80 features). The racial gap is the approval-rate difference between White and Black or African American applicants.
+### The experiment ladder
 
-| Model | Accuracy | F1 | ROC-AUC | Racial Approval Gap | TPR Gap (White − Black) | Notes |
-|---|---|---|---|---|---|---|
-| Logistic Regression (baseline) | 0.7120 | 0.7874 | 0.7697 | 34.56 pp | 32.31 pp | Reference point (`02_Modelo_Baseline.ipynb`) |
-| LightGBM, unconstrained | 0.8621 | 0.9116 | 0.8868 | 18.39 pp | 5.20 pp | Winner of the comparison (`03_Modelo_Sesgado_XAI.ipynb`) |
-| LightGBM, bias-mitigated | **0.8622** | **0.9117** | 0.7803 | **13.71 pp** | **1.67 pp** | `ExponentiatedGradient` + `EqualizedOdds` (`04_Modelo_Mitigado_XAI.ipynb`) |
+| Model | Accuracy | F1 | ROC-AUC | Approval White | Approval Black | Racial Gap | TPR Gap |
+|---|---|---|---|---|---|---|---|
+| Logistic Regression | 0.7120 | 0.7874 | 0.7697 | 66.85% | 32.29% | 34.56 pp | 32.31 pp |
+| LightGBM, unconstrained | 0.8621 | 0.9116 | 0.8868 | 85.25% | 66.86% | 18.39 pp | 5.20 pp |
+| LightGBM + `ExponentiatedGradient` | 0.8622 | 0.9117 | 0.7803 | 84.13% | 70.42% | 13.71 pp | 1.67 pp |
 
-**What the results show**
+![Performance vs fairness trade-off](outputs/images/tradeoff_final.png)
 
-* **Bias is structural, not model-specific.** Even the simple linear baseline reproduces a 34.56 pp racial approval gap, reflecting historical inequality in the data.
-* **LightGBM was selected for performance and efficiency.** It matches Gradient Boosting on ROC-AUC (0.8868 vs. 0.8871) while training in 1.90 s instead of ~320 s, which matters for the iterative retraining that mitigation requires. Its lower gap versus the baseline (18.39 pp) is a side effect of better overall fit, not of any fairness treatment, and SHAP confirms the model actively uses race.
-* **Mitigation narrows the gap at almost no cost to decisions.** The racial gap falls from 18.39 pp to 13.71 pp: approval for Black applicants rises from 66.86% to 70.42% while White approval moves from 85.25% to 84.13%. Accuracy and F1 are essentially unchanged, and the confusion matrices are nearly identical (false negatives 1,484 → 1,455; false positives 6,329 → 6,354).
-* **The real cost is ranking power.** ROC-AUC drops from 0.8868 to 0.7803 (−10.65 pp), so the trade-off lands on the model's ability to rank applicants by probability, not on its binary decisions.
-* **Demographic influence shrinks, financial logic stays intact.** SHAP importance of `derived_race_White` falls from ~0.10 (rank 8) to ~0.03, while `debt_to_income_ratio`, `preapproval`, `loan_purpose` and `aus_1` keep their dominance.
+Reading the ladder step by step:
 
-**Limitations (stated openly)**
+* **Linear → LightGBM:** the gap halves (34.56 → 18.39 pp), but only because the model fits better overall. Nothing in it targets fairness.
+* **Unconstrained → mitigated:** the gap falls by 4.68 pp and the TPR gap by 68%, at a cost of 10.65 pp of ROC-AUC. As a rough exchange rate, each point of gap closed cost ~2.3 points of AUC.
+* **Decision quality is intact:** Accuracy and F1 move by less than 0.001, and the confusion matrices differ by under 30 cases per cell (false negatives 1,484 → 1,455, false positives 6,329 → 6,354). The cost sits in how well the model ranks probabilities.
 
-* The fairness constraint targets a single binary attribute (`derived_race_White`). The ethnicity gap stays essentially unchanged (~13 pp) and sex disparities barely move, so mitigating one dimension does not generalize to others.
-* A residual racial gap of 13.71 pp remains; algorithmic mitigation reduces bias but does not eliminate it, and should sit within a broader human-led audit process.
-* HMDA records bank decisions, not true creditworthiness, so models learn to replicate historical decisions, including their bias.
-* `ExponentiatedGradient` returns a randomized classifier, which introduces variability to account for in any real deployment.
+### Effect on each sensitive axis
+
+| Axis | Groups compared | Unconstrained gap | Mitigated gap |
+|---|---|---|---|
+| Race (constrained) | White vs. Black | 18.39 pp | 13.71 pp |
+| Ethnicity | Not Hispanic vs. Hispanic | 13.14 pp | 13.09 pp |
+| Sex | Male vs. Female | 1.10 pp | 0.91 pp |
+
+The constraint targets `derived_race_White` only, and the table shows it: ethnicity does not move.
+
+### What the model looks at
+
+![SHAP importance before and after mitigation](outputs/images/shap_bar_comparativo.png)
+
+`derived_race_White` sits 8th in the unconstrained model (~0.10 mean |SHAP|) and drops to ~0.03 after mitigation. `debt_to_income_ratio`, `preapproval`, `loan_purpose` and `aus_1` remain the dominant features in both.
+
+### Model selection
+
+![ROC curves of all models](outputs/images/curva_roc_modelos.png)
+
+Random Forest, Gradient Boosting, XGBoost and LightGBM land within 0.008 ROC-AUC of each other (0.8792 to 0.8871). LightGBM was chosen because it trains in 1.90 s against ~320 s for Gradient Boosting, which matters when mitigation retrains the model repeatedly. Tuning: `GridSearchCV`, 108 combinations, 3-fold, `roc_auc`.
+
+### Scope of the claims
+
+* The residual 13.71 pp gap means mitigation reduces bias; it does not remove it.
+* HMDA records what banks decided, not whether applicants were creditworthy, so the model learns historical decisions, bias included.
+* `ExponentiatedGradient` returns a randomized classifier, so predictions carry some variance.
+* Natural extensions: multi-attribute constraints, `ThresholdOptimizer`, reweighing and intersectional subgroups.
 
 ---
 
 ## Tech Stack
 
-| Category | Tools |
-|---|---|
-| **Language** | Python 3.x |
-| **Data manipulation** | `pandas`, `numpy` |
-| **Visualization** | `matplotlib`, `seaborn` |
-| **ML & preprocessing** | `scikit-learn` |
-| **Ensemble models** | `scikit-learn`, `xgboost`, `lightgbm` |
-| **Explainability (XAI)** | `shap` |
-| **Fairness & mitigation** | `fairlearn` |
-| **Reproducibility** | `RANDOM_STATE = 42` |
+`Python 3.x` · `pandas` · `numpy` · `scikit-learn` · `lightgbm` · `xgboost` · `shap` · `fairlearn` · `matplotlib` · `seaborn`
 
 ---
 
@@ -110,58 +108,72 @@ Every model is evaluated on two axes: **predictive performance** and **fairness*
 
 ```text
 AA-PROYECTO-HMDA-NY/
-├── 📁 data/                                # Git-ignored due to size (.csv files)
-├── 📁 models/                              # Git-ignored due to size (.pkl models)
+├── 📁 data/                       # Git-ignored; regenerated by notebook 01
+├── 📁 models/                     # Git-ignored; regenerated by notebook 03
 │   ├── gradient_boosting.pkl
 │   ├── lightgbm.pkl
 │   ├── random_forest.pkl
 │   └── xgboost.pkl
 ├── 📁 notebooks/
-│   ├── 01_EDA_Limpieza.ipynb               # Exploration, bias detection and preprocessing
-│   ├── 02_Modelo_Baseline.ipynb            # Logistic Regression + baseline fairness metrics
-│   ├── 03_Modelo_Sesgado_XAI.ipynb         # Ensemble models + SHAP analysis
-│   └── 04_Modelo_Mitigado_XAI.ipynb        # Fairlearn mitigation + post-mitigation SHAP
+│   ├── 01_EDA_Limpieza.ipynb               # Audit, leakage removal, preprocessing
+│   ├── 02_Modelo_Baseline.ipynb            # Logistic Regression + fairness baseline
+│   ├── 03_Modelo_Sesgado_XAI.ipynb         # Ensembles + SHAP audit
+│   └── 04_Modelo_Mitigado_XAI.ipynb        # Fairlearn mitigation + SHAP comparison
 ├── 📁 outputs/
-│   └── images/                             # Exported charts
+│   └── images/                    # Exported charts
 ├── 📁 report/
 │   ├── report.tex
-│   └── report.pdf
+│   └── report.pdf                 # Full technical report (Spanish)
 ├── 📄 .gitignore
-├── 📄 hmda-presentacion.html               # Project presentation
+├── 📄 hmda-presentacion.html      # Project presentation
 ├── 📄 README.md
 └── 📄 requirements.txt
 ```
-
-> `data/` and `models/` are not included in the repository because of GitHub size limits. The project is fully reproducible:
->
-> * Running `01_EDA_Limpieza.ipynb` generates every file in `data/`, including `train.csv` and `test.csv` (the only ones required by notebooks 02, 03 and 04).
-> * Running `03_Modelo_Sesgado_XAI.ipynb` saves all trained ensemble models, one per strategy.
 
 ---
 
 ## Setup & Execution
 
-1. **Clone the repository**
-    ```bash
-    git clone https://github.com/jcm204/aa-proyecto-hmda-ny.git
-    cd aa-proyecto-hmda-ny
-    ```
+```bash
+git clone https://github.com/jcm204/aa-proyecto-hmda-ny.git
+cd aa-proyecto-hmda-ny
+pip install -r requirements.txt
+```
 
-2. **Install dependencies**
-    ```bash
-    pip install -r requirements.txt
-    ```
+1. Download the dataset from the [CFPB HMDA Data Browser](https://ffiec.cfpb.gov/data-browser/data/2024?category=states&items=NY) and save it as `data/state_NY.csv`.
+2. Run `01_EDA_Limpieza.ipynb` end to end. It writes `data/train.csv` and `data/test.csv`, needed by every later notebook.
+3. Run `02_Modelo_Baseline.ipynb` → `03_Modelo_Sesgado_XAI.ipynb` → `04_Modelo_Mitigado_XAI.ipynb`. Notebook 03 saves the trained ensembles to `models/`.
 
-3. **Download the dataset** from the official source and place it at `data/state_NY.csv`:
-    [HMDA Data Browser: New York 2024 (CFPB)](https://ffiec.cfpb.gov/data-browser/data/2024?category=states&items=NY)
-
-4. **Run `01_EDA_Limpieza.ipynb` in full.** It generates `data/train.csv` and `data/test.csv`. The remaining notebooks cannot run without this step.
-
-5. **Run the remaining notebooks in order:**
-    ```text
-    02_Modelo_Baseline.ipynb  →  03_Modelo_Sesgado_XAI.ipynb  →  04_Modelo_Mitigado_XAI.ipynb
-    ```
+Full methodology and discussion: [`report/report.pdf`](report/report.pdf).
 
 ---
 
-<sub>**Collaborators:** Izan Cuesta Corbí, Dennis García Solera, Marcos Segurado Llopis, Jesús Cano Moya.</sub>
+## References
+
+**Fairness foundations**
+
+1. Barocas & Selbst (2016). *Big Data's Disparate Impact*. California Law Review.
+2. Hardt et al. (2016). *Equality of Opportunity in Supervised Learning*. NeurIPS.
+3. Kleinberg et al. (2017). *Inherent Trade-Offs in the Fair Determination of Risk Scores*. ITCS.
+4. Mehrabi et al. (2021). *A Survey on Bias and Fairness in Machine Learning*. ACM Computing Surveys.
+
+**Mitigation**
+
+5. Agarwal et al. (2018). *A Reductions Approach to Fair Classification*. ICML.
+6. Bird et al. (2020). *Fairlearn: A Toolkit for Assessing and Improving Fairness in AI*. Microsoft Technical Report.
+
+**Modelling and explainability**
+
+7. Ke et al. (2017). *LightGBM: A Highly Efficient Gradient Boosting Decision Tree*. NeurIPS.
+8. Lundberg & Lee (2017). *A Unified Approach to Interpreting Model Predictions*. NeurIPS.
+
+---
+
+## Collaborators
+
+Developed as a collaborative project at the Universidad de Alicante, BSc in Artificial Intelligence Engineering (2025/26).
+
+- Jesús Cano Moya
+- Izan Cuesta Corbí
+- Dennis García Solera
+- Marcos Segurado Llopis
