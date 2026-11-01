@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sesgo, Equidad y Explicabilidad en Hipotecas — HMDA NY 2024</title>
+
+<!-- Google Fonts: Manrope -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+
+<style>
+/* === CSS CUSTOM PROPERTIES — ELECTRIC STUDIO THEME === */
+:root {
+  --bg-dark:    #0a0a0a;
+  --bg-blue:    #4361ee;
+  --bg-blue-dk: #2d4bc4;
+  --text-light: #ffffff;
+  --text-muted: rgba(255,255,255,0.55);
+  --text-dark:  #0a0a0a;
+  --accent:     #4361ee;
+  --accent-lt:  #7b93ff;
+  --accent-hl:  #00d4ff;
+
+  --font: 'Manrope', sans-serif;
+  --title-size:    clamp(1.6rem, 4.5vw, 3.8rem);
+  --h2-size:       clamp(1.2rem, 3vw, 2.4rem);
+  --h3-size:       clamp(1rem, 2.2vw, 1.7rem);
+  --body-size:     clamp(0.75rem, 1.3vw, 1rem);
+  --small-size:    clamp(0.6rem, 1vw, 0.8rem);
+  --slide-padding: clamp(1.5rem, 4vw, 3.5rem);
+  --content-gap:   clamp(0.75rem, 1.8vw, 1.5rem);
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur: 0.65s;
+}
+
+/* === VIEWPORT BASE CSS (mandatory) === */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+html, body { height:100%; overflow-x:hidden; font-family: var(--font); }
+html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+
+.slide {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.slide-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-height: 100%;
+  overflow: hidden;
+  padding: var(--slide-padding);
+}
+
+img, .image-container {
+  max-width: 100%;
+  max-height: min(50vh, 400px);
+  object-fit: contain;
+}
+
+.grid { display: grid; gap: clamp(0.5rem,1.5vw,1rem); }
+
+@media (max-height: 700px) {
+  :root { --slide-padding: clamp(0.75rem,3vw,2rem); --title-size: clamp(1.25rem,4.5vw,2.5rem); --h2-size: clamp(1rem,3vw,1.75rem); }
+}
+@media (max-height: 600px) {
+  :root { --slide-padding: clamp(0.5rem,2.5vw,1.5rem); --title-size: clamp(1.1rem,4vw,2rem); --body-size: clamp(0.7rem,1.2vw,0.95rem); }
+  .nav-dots, .keyboard-hint { display:none; }
+}
+@media (max-height: 500px) {
+  :root { --slide-padding:clamp(0.4rem,2vw,1rem); --title-size:clamp(1rem,3.5vw,1.5rem); --h2-size:clamp(0.9rem,2.5vw,1.25rem); --body-size:clamp(0.65rem,1vw,0.85rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration:0.01ms !important; transition-duration:0.2s !important; }
+  html { scroll-behavior: auto; }
+}
+
+/* === REVEAL ANIMATIONS === */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.reveal-left {
+  opacity: 0;
+  transform: translateX(-28px);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.reveal-right {
+  opacity: 0;
+  transform: translateX(28px);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.reveal-scale {
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.slide.visible .reveal,
+.slide.visible .reveal-left,
+.slide.visible .reveal-right,
+.slide.visible .reveal-scale {
+  opacity: 1;
+  transform: none;
+}
+.slide.visible .reveal:nth-child(1)      { transition-delay: 0.05s; }
+.slide.visible .reveal:nth-child(2)      { transition-delay: 0.15s; }
+.slide.visible .reveal:nth-child(3)      { transition-delay: 0.25s; }
+.slide.visible .reveal:nth-child(4)      { transition-delay: 0.35s; }
+.slide.visible .reveal:nth-child(5)      { transition-delay: 0.45s; }
+.slide.visible [data-delay="1"]          { transition-delay: 0.1s; }
+.slide.visible [data-delay="2"]          { transition-delay: 0.2s; }
+.slide.visible [data-delay="3"]          { transition-delay: 0.3s; }
+.slide.visible [data-delay="4"]          { transition-delay: 0.4s; }
+.slide.visible [data-delay="5"]          { transition-delay: 0.5s; }
+.slide.visible [data-delay="6"]          { transition-delay: 0.6s; }
+.slide.visible [data-delay="7"]          { transition-delay: 0.7s; }
+
+/* === PROGRESS BAR === */
+.progress-bar {
+  position: fixed; top: 0; left: 0;
+  height: 3px; background: var(--accent);
+  z-index: 1000; transition: width 0.3s ease;
+  box-shadow: 0 0 10px rgba(67,97,238,0.6);
+}
+
+/* === NAV DOTS === */
+.nav-dots {
+  position: fixed; right: 20px; top: 50%;
+  transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 10px;
+  z-index: 1000;
+}
+.nav-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+}
+.nav-dot.active { background: var(--accent); transform: scale(1.3); box-shadow: 0 0 8px rgba(67,97,238,0.8); }
+
+/* === SLIDE NUMBER === */
+.slide-number {
+  position: absolute; bottom: 24px; right: var(--slide-padding);
+  font-size: var(--small-size); font-weight: 700;
+  color: rgba(255,255,255,0.2); letter-spacing: 0.1em;
+  z-index: 10;
+}
+.slide-number span { color: var(--accent-lt); }
+
+/* === SHARED LAYOUT: SPLIT PANEL === */
+.split {
+  display: flex;
+  width: 100%; height: 100%;
+}
+.split .left {
+  flex: 0 0 42%;
+  background: var(--bg-dark);
+  display: flex; flex-direction: column; justify-content: center;
+  padding: var(--slide-padding);
+  position: relative;
+  overflow: hidden;
+}
+.split .right {
+  flex: 1;
+  background: var(--bg-blue);
+  position: relative;
+  overflow: hidden;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: var(--slide-padding);
+}
+/* Vertical accent bar between panels */
+.split::after {
+  content: '';
+  position: absolute;
+  left: 42%;
+  top: 0; bottom: 0;
+  width: 3px;
+  background: var(--bg-blue);
+  z-index: 5;
+}
+
+/* Hatching pattern on blue panel */
+.split .right::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    45deg, transparent, transparent 32px,
+    rgba(255,255,255,0.035) 32px, rgba(255,255,255,0.035) 33px
+  );
+  pointer-events: none;
+}
+
+/* Bottom shimmer bar */
+.shimmer-bar {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--bg-blue) 0%, var(--accent-hl) 50%, var(--bg-blue) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 4s linear infinite;
+}
+@keyframes shimmer { from{background-position:0 0} to{background-position:200% 0} }
+
+/* === SHARED TEXT ELEMENTS === */
+.kicker {
+  font-size: var(--small-size);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent-lt);
+  margin-bottom: clamp(8px,1.5vh,14px);
+  display: flex; align-items: center; gap: 8px;
+}
+.kicker::before { content:''; display:block; width:20px; height:2px; background:var(--accent-lt); flex-shrink:0; }
+
+.slide-title {
+  font-size: var(--h2-size);
+  font-weight: 800;
+  color: var(--text-light);
+  line-height: 1.1;
+  margin-bottom: clamp(10px,1.8vh,18px);
+}
+.slide-title .hl { color: var(--accent-lt); }
+
+.body-text {
+  font-size: var(--body-size);
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+.divider {
+  width: clamp(40px,8%,70px);
+  height: 2px;
+  background: var(--accent);
+  margin: clamp(10px,1.8vh,18px) 0;
+  flex-shrink: 0;
+}
+
+/* Lists */
+ul.check-list { list-style: none; display: flex; flex-direction: column; gap: clamp(6px,1.2vh,12px); }
+ul.check-list li {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: var(--body-size); color: var(--text-muted); line-height: 1.45;
+}
+ul.check-list li::before {
+  content: '▸';
+  color: var(--accent-lt);
+  font-size: 0.9em;
+  flex-shrink: 0;
+  margin-top: 0.15em;
+}
+ul.check-list li strong { color: var(--text-light); }
+
+/* Right-panel image slide */
+.right-img {
+  position: relative; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%;
+}
+.right-img img {
+  max-width: 96%;
+  max-height: min(72vh, 520px);
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+/* Stat boxes */
+.stat-row { display: flex; flex-wrap: wrap; gap: clamp(8px,1.5vw,14px); }
+.stat-box {
+  flex: 1; min-width: 80px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 6px;
+  padding: clamp(8px,1.5vw,14px) clamp(10px,1.8vw,18px);
+}
+.stat-box .val {
+  font-size: clamp(1.1rem,2.8vw,2.2rem);
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+  margin-bottom: 3px;
+}
+.stat-box .lbl {
+  font-size: clamp(0.5rem,0.9vw,0.65rem);
+  color: rgba(255,255,255,0.6);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Table */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--small-size);
+}
+.data-table th {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+  padding: 8px 10px;
+  text-align: left;
+}
+.data-table td {
+  padding: 8px 10px;
+  color: var(--text-light);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.data-table tr.highlight td { color: var(--accent-lt); font-weight: 700; }
+.data-table .good { color: #5edd8a; }
+.data-table .warn { color: #f9c74f; }
+.data-table .bad  { color: #f06464; }
+
+/* Full-dark slide variant */
+.slide-dark { background: var(--bg-dark); }
+
+/* Section title slide */
+.section-title-slide {
+  background: var(--bg-blue);
+  align-items: center; justify-content: center;
+}
+.section-title-slide::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    45deg, transparent, transparent 32px,
+    rgba(255,255,255,0.04) 32px, rgba(255,255,255,0.04) 33px
+  );
+}
+
+/* Full-width content slide */
+.slide-full {
+  background: var(--bg-dark);
+  flex-direction: row;
+}
+.slide-full .slide-content {
+  padding: var(--slide-padding) calc(var(--slide-padding) * 1.5);
+}
+
+/* Top accent bar for full slides */
+.top-accent {
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--bg-blue);
+}
+
+/* Phase/step badges */
+.badge {
+  display: inline-flex; align-items: center;
+  background: rgba(67,97,238,0.18);
+  border: 1px solid rgba(67,97,238,0.5);
+  color: var(--accent-lt);
+  font-size: var(--small-size);
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 3px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+/* Inline editing elements */
+.edit-hotzone {
+  position: fixed; top: 0; left: 0;
+  width: 80px; height: 80px;
+  z-index: 10000; cursor: pointer;
+}
+.edit-toggle {
+  position: fixed; top: 16px; left: 16px;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 10001;
+  background: var(--accent);
+  border: none; border-radius: 50%;
+  width: 40px; height: 40px;
+  cursor: pointer; font-size: 16px;
+  box-shadow: 0 4px 16px rgba(67,97,238,0.5);
+}
+.edit-toggle.show, .edit-toggle.active { opacity:1; pointer-events:auto; }
+
+.edit-banner {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 36px; background: var(--accent);
+  display: none; align-items: center; justify-content: center; gap: 16px;
+  font-size: 0.75rem; font-weight: 700; color: #fff;
+  letter-spacing: 0.1em; z-index: 9999;
+}
+.edit-banner.active { display: flex; }
+.edit-banner button {
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.4);
+  color: #fff; padding: 3px 12px;
+  border-radius: 3px; cursor: pointer;
+  font-size: 0.7rem; font-weight: 700; font-family: var(--font);
+}
+
+body.edit-active [contenteditable]:hover {
+  outline: 2px dashed rgba(67,97,238,0.6);
+  border-radius: 2px;
+}
+body.edit-active [contenteditable]:focus {
+  outline: 2px solid var(--accent);
+  border-radius: 2px;
+}
+
+/* === SLIDE 01: PORTADA === */
+#s1 .left {
+  background: #050505;
+}
+#s1 .left .logo-row {
+  margin-bottom: clamp(16px,3vh,30px);
+}
+#s1 .left .univ {
+  font-size: var(--small-size);
+  font-weight: 700;
+  color: var(--accent-lt);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+#s1 .left .course {
+  font-size: var(--small-size);
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.06em;
+}
+#s1 .main-title {
+  font-size: clamp(1.6rem, 4.2vw, 3.4rem);
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.08;
+  margin-bottom: clamp(12px,2vh,22px);
+}
+#s1 .main-title .blue { color: var(--accent-lt); }
+#s1 .authors {
+  display: flex; flex-direction: column; gap: 5px;
+  margin-top: clamp(14px,2.5vh,24px);
+}
+#s1 .author {
+  display: flex; align-items: center; gap: 8px;
+  font-size: var(--small-size);
+  color: rgba(255,255,255,0.5);
+}
+#s1 .author::before { content:''; width:5px; height:5px; background:var(--accent); border-radius:50%; flex-shrink:0; }
+
+#s1 .right-content {
+  position: relative; z-index: 2;
+}
+#s1 .main-metric-label {
+  font-size: var(--small-size);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: 8px;
+}
+#s1 .main-metric-val {
+  font-size: clamp(3rem, 8vw, 6.5rem);
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+#s1 .main-metric-desc {
+  font-size: var(--small-size);
+  color: rgba(255,255,255,0.65);
+  line-height: 1.5;
+  max-width: 220px;
+  margin-bottom: 20px;
+}
+#s1 .mini-row {
+  display: flex; gap: 14px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255,255,255,0.18);
+}
+#s1 .mini { display: flex; flex-direction: column; gap: 2px; }
+#s1 .mini .v { font-size: clamp(1rem,2.2vw,1.6rem); font-weight:800; color:#fff; }
+#s1 .mini .l { font-size: clamp(0.4rem,0.75vw,0.55rem); color:rgba(255,255,255,0.45); letter-spacing:0.08em; text-transform:uppercase; }
+
+/* === SLIDE 02: AGENDA === */
+#s2.slide-dark .slide-content { position: relative; }
+#s2 .top-accent { background: var(--bg-blue); }
+#s2 .agenda-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(10px,2vw,20px);
+  margin-top: clamp(14px,2.5vh,24px);
+}
+#s2 .agenda-item {
+  background: rgba(67,97,238,0.08);
+  border: 1px solid rgba(67,97,238,0.2);
+  border-radius: 6px;
+  padding: clamp(12px,2vw,20px);
+  position: relative;
+  overflow: hidden;
+}
+#s2 .agenda-item::before {
+  content: '';
+  position: absolute; top: 0; left: 0;
+  width: 3px; height: 100%;
+  background: var(--accent);
+}
+#s2 .agenda-num {
+  font-size: clamp(1.6rem,3.5vw,3rem);
+  font-weight: 800;
+  color: rgba(67,97,238,0.25);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+#s2 .agenda-label {
+  font-size: clamp(0.75rem,1.4vw,1rem);
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+}
+#s2 .agenda-desc {
+  font-size: var(--small-size);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* === SLIDE 03: EL PROBLEMA === */
+
+/* === SLIDE 08: COMPARATIVA MODELOS === */
+#s8 .model-table-wrap {
+  position: relative; z-index: 2;
+  overflow: hidden;
+}
+
+/* === SLIDE 15: CONCLUSIONES === */
+#s15 .conc-list {
+  list-style: none;
+  display: flex; flex-direction: column;
+  gap: clamp(8px,1.5vh,14px);
+  margin-top: clamp(10px,2vh,20px);
+}
+#s15 .conc-list li {
+  display: flex; align-items: flex-start; gap: 12px;
+  font-size: var(--body-size);
+  color: var(--text-muted);
+  line-height: 1.5;
+  padding: clamp(8px,1.2vh,12px) 14px;
+  border-left: 2px solid var(--accent);
+  background: rgba(67,97,238,0.06);
+  border-radius: 0 4px 4px 0;
+}
+#s15 .conc-list li strong { color: #fff; }
+
+/* === SLIDE 16: CIERRE === */
+#s16 .right-close {
+  position: relative; z-index: 2;
+  display: flex; flex-direction: column; gap: clamp(12px,2vh,20px);
+}
+#s16 .close-box {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 6px;
+  padding: clamp(10px,1.8vw,18px);
+}
+#s16 .close-box-label {
+  font-size: var(--small-size);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: 6px;
+}
+#s16 .close-box-val {
+  font-size: var(--body-size);
+  color: #fff;
+  word-break: break-all;
+  font-weight: 600;
+}
+</style>
+</head>
+<body class="">
+
+<!-- Progress bar -->
+<div class="progress-bar" id="progressBar" style="width: 86.6667%;"></div>
+
+<!-- Navigation dots -->
+<nav class="nav-dots" id="navDots" aria-label="Navegación de diapositivas"><button class="nav-dot" aria-label="Ir a diapositiva 1"></button><button class="nav-dot" aria-label="Ir a diapositiva 2"></button><button class="nav-dot" aria-label="Ir a diapositiva 3"></button><button class="nav-dot" aria-label="Ir a diapositiva 4"></button><button class="nav-dot" aria-label="Ir a diapositiva 5"></button><button class="nav-dot" aria-label="Ir a diapositiva 6"></button><button class="nav-dot" aria-label="Ir a diapositiva 7"></button><button class="nav-dot" aria-label="Ir a diapositiva 8"></button><button class="nav-dot" aria-label="Ir a diapositiva 9"></button><button class="nav-dot" aria-label="Ir a diapositiva 10"></button><button class="nav-dot" aria-label="Ir a diapositiva 11"></button><button class="nav-dot" aria-label="Ir a diapositiva 12"></button><button class="nav-dot" aria-label="Ir a diapositiva 13"></button><button class="nav-dot active" aria-label="Ir a diapositiva 14"></button><button class="nav-dot" aria-label="Ir a diapositiva 15"></button><button class="nav-dot" aria-label="Ir a diapositiva 16"></button></nav>
+
+<!-- Inline editing UI -->
+<div class="edit-hotzone" id="editHotzone"></div>
+<button class="edit-toggle" id="editToggle" title="Editar texto (E)">✏️</button>
+<div class="edit-banner" id="editBanner">
+  MODO EDICIÓN ACTIVO
+  <button onclick="editor.exportFile()">💾 Guardar</button>
+  <button onclick="editor.toggleEditMode()">✕ Salir</button>
+</div>
+
+<!-- ============================================================ -->
+<!-- SLIDE 01: PORTADA -->
+<!-- ============================================================ -->
+<section class="slide visible" id="s1" aria-label="Portada">
+  <div class="split">
+    <div class="left">
+      <div class="logo-row reveal">
+        <div class="univ">Universidad de Alicante </div>
+        <div class="course">Aprendizaje Avanzado — Curso 2025/2026</div>
+      </div>
+      <h1 class="main-title reveal" data-delay="2">
+        Sesgo,<br>
+        <span class="blue">Equidad</span> y<br>
+        Explicabilidad<br>
+        en Hipotecas
+      </h1>
+      <div class="divider reveal" data-delay="3"></div>
+      <div class="authors reveal" data-delay="4">
+        <div class="author">Izan Cuesta Corbí</div>
+        <div class="author">Dennis García Solera</div>
+        <div class="author">Marcos Segurado Llopis</div>
+        <div class="author">Jesús Cano Moya</div>
+      </div>
+    </div>
+    <div class="right">
+      <div id="s1right" class="right-content reveal-right">
+        <div class="main-metric-label">Brecha racial reducida</div>
+        <div class="main-metric-val">−4.7pp</div>
+        <div class="main-metric-desc">
+          De 18,39 pp (sesgado)<br>
+          a 13,71 pp (mitigado)<br>
+          con <strong>EqualizedOdds</strong>
+        </div>
+        <div class="mini-row">
+          <div class="mini"><span class="v">283K</span><span class="l">Instancias</span></div>
+          <div class="mini"><span class="v">0.7803</span><span class="l">ROC-AUC</span></div>
+          <div class="mini"><span class="v">LightGBM</span><span class="l">Modelo</span></div>
+          <div class="mini"><span class="v">SHAP</span><span class="l">Explic.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="shimmer-bar"></div>
+  <div class="slide-number"><span>01</span> / 16</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 02: AGENDA -->
+<!-- ============================================================ -->
+<section class="slide slide-dark visible" id="s2" aria-label="Agenda">
+  <div class="top-accent"></div>
+  <div class="slide-content">
+    <div class="kicker reveal">Estructura del proyecto</div>
+    <h2 class="slide-title reveal" data-delay="2">Pipeline Completo</h2>
+    <div class="agenda-grid">
+      <div class="agenda-item reveal" data-delay="3">
+        <div class="agenda-num">01</div>
+        <div class="agenda-label">EDA &amp; Limpieza</div>
+        <div class="agenda-desc">Exploración del sesgo demográfico en datos crudos. Preprocesamiento con KNN + RobustScaler.</div>
+      </div>
+      <div class="agenda-item reveal" data-delay="4">
+        <div class="agenda-num">02</div>
+        <div class="agenda-label">Modelo Baseline</div>
+        <div class="agenda-desc">Regresión Logística como referencia de rendimiento y equidad. Brecha racial inicial: 34,56 pp.</div>
+      </div>
+      <div class="agenda-item reveal" data-delay="5">
+        <div class="agenda-num">03</div>
+        <div class="agenda-label">Ensambles + XAI</div>
+        <div class="agenda-desc">RF, GB, XGBoost, LightGBM con GridSearchCV. Auditoría SHAP del sesgo inherente.</div>
+      </div>
+      <div class="agenda-item reveal" data-delay="6">
+        <div class="agenda-num">04</div>
+        <div class="agenda-label">Mitigación + XAI</div>
+        <div class="agenda-desc">ExponentiatedGradient (Fairlearn) con EqualizedOdds. SHAP post-mitigación confirma la mejora.</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-number"><span>02</span> / 16</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 03: EL PROBLEMA -->
+<!-- ============================================================ -->
+<section class="slide visible" id="s3" aria-label="El problema">
+  <div class="split">
+    <div class="left">
+      <div class="kicker reveal">Motivación</div>
+      <h2 class="slide-title reveal" data-delay="2">¿Por qué importa el sesgo <span class="hl">hipotecario</span>?</h2>
+      <div class="divider reveal" data-delay="3"></div>
+      <ul class="check-list">
+        <li class="reveal" data-delay="3"><br><strong>La concesión de hipotecas afecta el acceso a la vivienda y la movilidad social</strong>.</li>
+        <li class="reveal" data-delay="4"><br><strong>Un modelo sesgado reproduce discriminación sistemática sobre miles de solicitantes reales</strong>.</li>
+        <li class="reveal" data-delay="5"><strong><br></strong><strong style="color: rgb(255, 255, 255); display: inline !important;">ECOA y Fair Housing Act. (EE.UU.) prohíben la discriminación crediticia por raza, sexo u origen.</strong><br></li>
+        <li class="reveal" data-delay="6"><span style="color: rgba(255, 255, 255, 0.5); font-size: 12.8px; font-style: italic; background-color: rgb(67, 97, 238);"><div style="color: rgb(187, 190, 191); background-color: rgb(18, 19, 20); font-family: &quot;Droid Sans Mono&quot;, monospace; font-size: 15px; line-height: 20px; white-space: pre;"><strong style="font-family: Manrope, sans-serif; color: rgb(255, 255, 255); font-size: 16px; font-style: normal; background-color: rgb(10, 10, 10); display: inline !important;">   Target: 'action_taken'  (1 = concedida, 0 = denegada) </strong></div></span></li>
+      </ul>
+    </div>
+    <div class="right">
+      <div class="right-content reveal-right" style="position:relative;z-index:2;">
+        <div class="main-metric-label">Dataset</div>
+        <div style="font-size:clamp(0.7rem,1.3vw,0.95rem);color:rgba(255,255,255,0.75);line-height:1.7;margin-bottom:18px;">
+          <strong>HMDA</strong> — Home Mortgage Disclosure Act<br>
+          Publicado por la <strong>CFPB</strong> (Consumer Financial Protection Bureau)<br>
+          Todas las solicitudes hipotecarias de <strong>Nueva York 2024</strong>
+        </div>
+        <div class="stat-row">
+          <div class="stat-box">
+            <div class="val">383K</div>
+            <div class="lbl">Originales</div>
+          </div>
+          <div class="stat-box">
+            <div class="val">283K</div>
+            <div class="lbl">Tras filtrado</div>
+          </div>
+        </div>
+        <div class="stat-row" style="margin-top:10px;">
+          <div class="stat-box">
+            <div class="val">74%</div>
+            <div class="lbl">Aprobadas</div>
+          </div>
+          <div class="stat-box">
+            <div class="val">26%</div>
+            <div class="lbl">Denegadas</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="shimmer-bar"></div>
+  <div class="slide-number"><span>03</span> / 16</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 04: DATASET & ATRIBUTOS SENSIBLES -->
+<!-- ============================================================ -->
+<section class="slide slide-dark visible" id="s4" aria-label="Dataset">
+  <div class="top-accent"></div>
+  <div class="slide-content">
+    <div class="kicker reveal">Datos</div>
+    <h2 class="slide-title reveal" data-delay="2">Dataset HMDA NY 2024</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:clamp(10px,2vw,20px);margin-top:clamp(10px,1.8vh,18px);">
+      <div>
+        <table class="data-table reveal" data-delay="3">
+          <tbody><tr><th>Característica</th><th>Valor</th></tr>
+          <tr><td>Instancias originales</td><td>383.577</td></tr>
+          <tr><td>Tras filtrado</td><td>~283.000</td></tr>
+          <tr><td>Columnas originales</td><td>99</td></tr>
+          <tr><td>Features preprocesadas</td><td>80</td></tr>
+          <tr class="highlight"><td>Train / Test</td><td>226K / 57K</td></tr>
+        </tbody></table>
+      </div>
+      <div>
+        <div class="badge reveal" data-delay="4">Atributos sensibles</div>
+        <ul class="check-list reveal" data-delay="5">
+          <li><strong>derived_race_*</strong> — Raza del solicitante (18 categorías OHE)</li>
+          <li><strong>derived_sex_*</strong> — Sexo</li>
+          <li><strong>derived_ethnicity_*</strong> — Etnia (hispano / no hispano)</li>
+        </ul>
+        <div class="badge" style="margin-top:14px;" data-delay="6">Eliminación de data leakage</div>
+        <ul class="check-list reveal" data-delay="6" style="margin-top:8px;">
+          <li>denial_reason_* (solo tras denegación)</li>
+          <li>interest_rate, rate_spread (solo si aprobado)</li>
+          <li>origination_charges (evento post-concesión)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="slide-number"><span>04</span> / 16</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 05: EDA — SESGO EN LOS DATOS -->
+<!-- ============================================================ -->
+<section class="slide visible" id="s5" aria-label="EDA Sesgo demográfico">
+  <div class="split">
+    <div class="left">
+      <div class="kicker reveal">EDA · Notebook 1</div>
+      <h2 class="slide-title reveal" data-delay="2">Sesgo demográfico<br><span class="hl">previo al modelado</span></h2>
+      <div class="divider reveal" data-delay="3"></div>
+      <ul class="check-list">
+        <li class="reveal" data-delay="3"><br><strong>Las personas blancas superan la media global&nbsp;de aprobación.</strong><br></li>
+        <li class="reveal" data-delay="4"><br><strong>Personas negras y grupos minoritarios&nbsp;quedan sistemáticamente por debajo.</strong><br></li>
+        <li class="reveal" data-delay="5"><br><strong>Tendencia similar en etnia&nbsp;(hispanos vs no hispanos) y, en menor medida, en&nbsp;<strong style="display: inline !important;">sexo.</strong></strong>.</li>
+        <li class="reveal" data-delay="6"><br><br><font color="#ffffff"><b>&nbsp;Correlación de derived_race_White con target: +0,09 (positiva). Frente a Black con un target de -0.09 (negativa).</b></font><strong><br></strong><br><br>.</li>
+      </ul>
+    </div>
+    <div class="right">
+      <div class="right-img">
+        <img src="outputs/images/2_1_sesgo_demografico.png" alt="Tasas de aprobación por raza, sexo y etnia (datos crudos HMDA NY 2024)">
+      </div>
+    </div>
+  </div>
+  <div class="shimmer-bar"></div>
+  <div class="slide-number"><span>05</span> / 16</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 06: PREPROCESAMIENTO -->
+<!-- ============================================================ -->
+<section class="slide slide-dark visible" id="s6" aria-label="Preprocesamiento">
+  <div class="top-accent"></div>
+  <div class="slide-content">
+    <div class="kicker reveal">Pipeline · Notebook 1</div>
+    <h2 class="slide-title reveal" data-delay="2">Preprocesamiento&nbsp;</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:clamp(12px,2.5vw,24px);margin-top:clamp(10px,1.8vh,18px);">
+      <ul class="check-list">
+        <li class="reveal" data-delay="3"><strong>Filtrado de columnas:</strong> identificadores, constantes y variables con leakage eliminados.</li>
+        <li class="reveal" data-delay="4"><strong>Variables ordinales:</strong> applicant_age, debt_to_income_ratio → mapeo jerárquico.</li>
+        <li class="reveal" data-delay="5"><strong>One-Hot Encoding:</strong> raza, sexo, etnia, tipo de préstamo. (82→108 columnas).</li>
+        <li class="reveal" data-delay="6"><strong>Umbral faltantes:</strong> columnas con &gt;50 % nulos eliminadas.</li>
+      </ul>
+      <ul class="check-list">
+        <li class="reveal" data-delay="3"><strong>Partición estratificada</strong> antes del preprocesamiento (80/20) para evitar leakage.</li>
+        <li class="reveal" data-delay="4"><strong>KNNImputer</strong> (k=5): imputación robusta de valores faltantes.</li>
+        <li class="reveal" data-delay="5"><strong>RobustScaler:</strong> frente a la asimetría extrema de loan_amount y property_value.</li>
+        <li class="reveal" data-delay="6">Sensibles conservados en CSV para reconstruir grupos de fairness en notebooks 3 y 4.</li>
+      </ul>
+    </div>
+    <div class="stat-row reveal" data-delay="7" style="margin-top:clamp(12px,2vh,20px);">
+      <div class="stat-box"><div class="val">226K</div><div class="lbl">Train</div></div>
+      <div class="stat-box"><div class="val">57K</div><div class="lbl">Test</div></div>
+      <div class="stat-box"><div class="val">80</div><div class="lbl">Features</div></div>
+      <div class="stat-box"><div class="val">42</div><div class="lbl">Random state</div></div>
+    </div>
+  </div>
+  <div class="slide-number"><span>06</span> / 16</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 07: MODELO BASELINE -->
+<!-- ============================================================ -->
+<section class="slide visible" id="s7" aria-label="Modelo Baseline">
+  <div class="split">
+    <div class="left">
+      <div class="badge reveal">Notebook 2</div>
+      <h2 class="slide-title reveal" data-delay="2">Modelo Baseline<br><span class="hl">Regresión Logística</span></h2>
+      <div class="divider reveal" data-delay="3"></div>
+      <ul class="check-list">
+        <li class="reveal" data-delay="3"><strong>class_weight='balanced'&nbsp;para compensar desbalance 74/26.</strong></li>
+        <li class="reveal" data-delay="4">Accuracy:<strong>0.7120</strong> · F1: <strong>0.7874</strong> · ROC-AUC: <strong>0.7697</strong>.</li>
+        <li class="reveal" data-delay="5"><strong style="color: rgb(255, 255, 255); display: inline !important;">Brecha racial White vs. Black: 34,56 pp&nbsp;<span style="color: rgba(255, 255, 255, 0.55);">&nbsp;(la mayor de los tres modelos del proyecto)</span></strong><strong style="color:#f06464;"><br></strong><br></li>
+        <li class="reveal" data-delay="6">Confirma que incluso un modelo lineal sin restricciones discrimina estructuralmente cuando los datos reflejan desigualdades históricas.</li>
+      </ul>
+    </div>
+    <div class="right">
+      <div class="right-img">
+        <img src="outputs/images/fairness_baseline.png" alt="Tasas de aprobación por grupo — Modelo Baseline">
+      </div>
+    </div>
+  </div>
+  <div class="shimmer-bar"></div>
+  <div class="slide-number"><span>07</span> / 16</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 08: COMPARATIVA DE ENSAMBLES -->
+<!-- ============================================================ -->
+<section class="slide slide-dark visible" id="s8" aria-label="Comparativa de modelos">
+  <div class="top-accent"></div>
+  <div class="slide-content">
+    <div class="kicker reveal">Notebook 3 · GridSearchCV</div>
+    <h2 class="slide-title reveal" data-delay="2">Selección del modelo de ensamble</h2>
+    <div style="display:grid;grid-template-columns:1.1fr 0.9fr;gap:clamp(14px,2.5vw,26px);margin-top:clamp(10px,1.8vh,18px);">
+      <div class="model-table-wrap reveal" data-delay="3">
+        <table class="data-table">
+          <thead>
+            <tr><th>Modelo</th><th>Accuracy</th><th>F1</th><th>ROC-AUC</th><th>Tiempo</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Baseline (LogReg)</td><td>0.7120</td><td>0.7874</td><td>0.7694</td><td>~49 s</td></tr>
+            <tr><td>Random Forest</td><td>0.8572</td><td>0.9067</td><td>0.8792</td><td>~120 s</td></tr>
+            <tr><td>Gradient Boosting</td><td>0.8619</td><td>0.9113</td><td>0.8871</td><td>~320 s</td></tr>
+            <tr><td>XGBoost</td><td>0.8612</td><td>0.9110</td><td>0.8864</td><td>~45 s</td></tr>
+            <tr class="highlight"><td><strong>LightGBM ✓</strong></td><td>0.8621</td><td>0.9116</td><td>0.8868</td><td><strong>1,9 s</strong></td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:var(--small-size);color:var(--text-muted);margin-top:10px;line-height:1.5;">LightGBM ganador: ROC-AUC prácticamente idéntico al GB pero <strong style="color:var(--accent-lt);">168× más rápido</strong>. Clave para la optimización iterativa de Fairlearn.</p>
+      </div>
+      <div class="reveal" data-delay="4" style="display:flex;align-items:center;">
+        <img src="outputs/images/curva_roc_modelos.png" alt="Curvas ROC comparativas — todos los modelos" style="max-width:100%;max-height:min(48vh,350px);object-fit:contain;border-radius:6px;border:1px solid rgba(255,255,255,0.1);">
+      </div>
+    </div>
+  </div>
+  <div class="slide-number"><span>08</span> / 16</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 09: FAIRNESS MODELO SESGADO -->
+<!-- ============================================================ -->
+<section class="slide visible" id="s9" aria-label="Fairness LightGBM sesgado">
+  <div class="split">
+    <div class="left">
+      <div class="badge reveal">Notebook 3 · Fairness</div>
+      <h2 class="slide-title reveal" data-delay="2">LightGBM sesgado:<br><span class="hl">auditoría de equidad</span></h2>
+      <div class="divider reveal" data-delay="3"></div>
+      <table class="data-table reveal" data-delay="4" style="margin-bottom:12px;">
+        <thead><tr><th>Grupo</th><th>Approval Rate</th><th>TPR</th></tr></thead>
+        <tbody>
+          <tr><td>White</td><td>85,25 %</td><td>0.9709</td></tr>
+          <tr class="highlight"><td>Black / African Am.</td><td>66,86 %</td><td>0.9189</td></tr>
+          <tr><td><strong>Brecha racial</strong></td><td class="bad"><strong>18,39 pp</strong></td><td>—</td></tr>
+        </tbody>
+      </table>
+      <p class="body-text reveal" data-delay="5">LightGBM reduce la brecha racial (34,56→18,39 pp) como <strong>efecto secundario de un mejor ajuste global</strong>, no por diseño.</p>
+    </div>
+    <div class="right">
+      <div class="right-img">
+        <img src="outputs/images/fairness_lgbm.png" alt="Tasas de aprobación por grupo — LightGBM sesgado">
+      </div>
+    </div>
+  </div>
+  <div class="shimmer-bar"></div>
+  <div class="slide-number"><span>09</span> / 16</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 10: SHAP — EL SESGO AL DESCUBIERTO -->
+<!-- ============================================================ -->
+<section class="slide visible" id="s10" aria-label="Análisis SHAP sesgado">
+  <div class="split">
+    <div class="left">
+      <div class="badge reveal">Notebook 3 · SHAP</div>
+      <h2 class="slide-title reveal" data-delay="2">El sesgo<br><span class="hl">al descubierto</span></h2>
+      <div class="divider reveal" data-delay="3"></div>
+      <ul class="check-list">
+        <li class="reveal" data-delay="3"><code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:2px;">debt_to_income_ratio</code> domina absolutamente (importancia SHAP ≈ 1.0).</li>
+        <li class="reveal" data-delay="4"><code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:2px;">derived_race_White</code> ocupa la&nbsp;posición 8 con importancia media absoluta ≈ 0,10<div><strong><br></strong>.</div></li>
+        <li class="reveal" data-delay="5">Valores altos de race_White empujan hacia la aprobación → el modelo usa la raza activamente. <strong><br></strong><br></li>
+        <li class="reveal" data-delay="6">Esto justifica la necesidad de mitigación en el Notebook 4.</li>
+      </ul>
+    </div>
+    <div class="right">
+      <div class="right-img">
+        <img src="outputs/images/shap_bar_sesgado.png" alt="SHAP Feature Importance — LightGBM sesgado">
+      </div>
+    </div>
+  </div>
+  <div class="shimmer-bar"></div>
+  <div class="slide-number"><span>10</span> / 16</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 11: MITIGACIÓN — EXPONENTIATEDGRADIENT -->
+<!-- ============================================================ -->
+<section class="slide slide-dark visible" id="s11" aria-label="Técnica de mitigación">
+  <div class="top-accent"></div>
+  <div class="slide-content">
+    <div class="kicker reveal">Notebook 4 · Fairlearn</div>
+    <h2 class="slide-title reveal" data-delay="2">Mitigación: <span style="color:var(--accent-lt);">ExponentiatedGradient</span></h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:clamp(12px,2.5vw,24px);margin-top:clamp(10px,1.8vh,18px);">
+      <ul class="check-list">
+        <li class="reveal" data-delay="3"><strong>Técnica de procesamiento interno:</strong>Entrena iterativamente múltiples versiones del modelo base con distintos pesos por muestra.</li>
+        <li class="reveal" data-delay="4"><strong>Restricción:</strong> <code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:2px;">EqualizedOdds</code>&nbsp;igualdad de TPR y FPR entre el grupo derived_race_White y el resto.<div><br></div></li>
+        <li class="reveal" data-delay="5"><strong>Atributo sensible principal:</strong> <code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:2px;">derived_race_White</code> (posición 8 en SHAP, mayor sesgo).</li>
+        <li class="reveal" data-delay="6"><strong style="color: rgb(255, 255, 255); display: inline !important;">Las predicciones se obtienen con _pmf_predict :&nbsp;<span style="color: rgba(255, 255, 255, 0.55);">Fairlearn combina internamente varios predictores ponderados.</span></strong><span style="background-color: rgba(255, 255, 255, 0.1);"><br></span><br></li>
+      </ul>
+      <ul class="check-list">
+        <li class="reveal" data-delay="3">Reduce el problema de clasificación justa a una secuencia de problemas de clasificación sensible al coste.</li>
+        <li class="reveal" data-delay="4">Devuelve el clasificador aleatorizado con menor error empírico sujeto a las restricciones de equidad.</li>
+        <li class="reveal" data-delay="5">SHAP calculado sobre la&nbsp;media ponderada de los predictores (predictors_ y weights_) para representatividad del ensemble mitigado.</li>
+        <li class="reveal" data-delay="6">LightGBM elegido como base por ser mucho más rápido que Gradient Boosting — crítico para el reentrenamiento iterativo.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="slide-number"><span>11</span> / 16</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 12: RESULTADOS FAIRNESS POST-MITIGACIÓN -->
+<!-- ============================================================ -->
+<section class="slide visible" id="s12" aria-label="Resultados fairness post-mitigación">
+  <div class="split">
+    <div class="left">
+      <div class="badge reveal">Notebook 4 · Fairness</div>
+      <h2 class="slide-title reveal" data-delay="2">Fairness tras la<br><span class="hl">mitigación</span></h2>
+      <div class="divider reveal" data-delay="3"></div>
+      <table class="data-table reveal" data-delay="4">
+        <thead><tr><th>Grupo</th><th>Sesgado</th><th>Mitigado</th><th>Δ</th></tr></thead>
+        <tbody>
+          <tr><td>White</td><td>85,25 %</td><td>84,13 %</td><td class="good">−1,12</td></tr>
+          <tr><td>Black</td><td>66,86 %</td><td>70,42 %</td><td class="good">+3,56</td></tr>
+          <tr class="highlight"><td>Brecha racial</td><td class="bad">18,39 pp</td><td class="warn">13,71 pp</td><td class="good"><strong>−4,7</strong></td></tr>
+        </tbody>
+      </table>
+      <p class="body-text reveal" data-delay="5" style="margin-top:10px;">Nivelar implica <strong>ceder algo en el grupo dominante</strong>. La restricción se aplicó sobre raza: no generaliza automáticamente a etnia.</p>
+    </div>
+    <div class="right">
+      <div class="right-img">
+        <img src="outputs/images/fairness_sesgos.png" alt="Comparativa fairness sesgado vs mitigado">
+      </div>
+    </div>
+  </div>
+  <div class="shimmer-bar"></div>
+  <div class="slide-number"><span>12</span> / 16</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 13: RENDIMIENTO — TRADE-OFF ROC-AUC -->
+<!-- ============================================================ -->
+<section class="slide slide-dark visible" id="s13" aria-label="Trade-off rendimiento">
+  <div class="top-accent"></div>
+  <div class="slide-content">
+    <div class="kicker reveal">Notebook 4 · Performance</div>
+    <h2 class="slide-title reveal" data-delay="2">El trade-off rendimiento / equidad</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:clamp(14px,2.5vw,26px);margin-top:clamp(10px,1.8vh,18px);">
+      <div>
+        <table class="data-table reveal" data-delay="3">
+          <thead><tr><th>Modelo</th><th>Accuracy</th><th>F1</th><th>ROC-AUC</th></tr></thead>
+          <tbody>
+            <tr><td>LightGBM Sesgado</td><td>0.8621</td><td>0.9116</td><td>0.8868</td></tr>
+            <tr class="highlight"><td>LightGBM Mitigado</td><td>0.8622</td><td>0.9117</td><td class="warn">0.7803</td></tr>
+          </tbody>
+        </table>
+        <ul class="check-list reveal" data-delay="4" style="margin-top:14px;">
+          <li>Accuracy y F1 prácticamente<strong style="display: inline !important;">idénticos</strong> (diferencias &lt; 0,001).</li>
+          <li><br><strong>ROC-AUC cae de 0,8868 a 0,7803 (−10,6 pp):&nbsp;<span style="color: rgba(255, 255, 255, 0.55);">El modelo pierde poder discriminativo en el ordenamiento de probabilidades.</span></strong></li>
+          <li><strong style="color: rgb(255, 255, 255); display: inline !important;">Accuracy/F1 no son suficientes para detectar sesgo:&nbsp; <span style="color: rgba(255, 255, 255, 0.55);">Dos modelos pueden tener matrices de confusión casi idénticas y diferir significativamente en equidad.</span></strong></li>
+        </ul>
+      </div>
+      <div class="reveal" data-delay="5" style="display:flex;align-items:center;">
+        <img src="outputs/images/curva_roc_sesgos.png" alt="Curvas ROC comparativas sesgado vs mitigado" style="max-width:100%;max-height:min(46vh,340px);object-fit:contain;border-radius:6px;border:1px solid rgba(255,255,255,0.1);">
+      </div>
+    </div>
+  </div>
+  <div class="slide-number"><span>13</span> / 16</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 14: SHAP COMPARATIVO -->
+<!-- ============================================================ -->
+<section class="slide visible" id="s14" aria-label="SHAP comparativo">
+  <div class="split">
+    <div class="left">
+      <div class="badge reveal">XAI · SHAP comparativo</div>
+      <h2 class="slide-title reveal" data-delay="2">SHAP confirma la<br><span class="hl">neutralización del sesgo</span></h2>
+      <div class="divider reveal" data-delay="3"></div>
+      <ul class="check-list">
+        <li class="reveal" data-delay="3"><code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:2px;">debt_to_income_ratio</code> mantiene su dominio absoluto en ambos modelos. <strong><br></strong><br></li>
+        <li class="reveal" data-delay="4"><code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:2px;">derived_race_White</code><br><strong>&nbsp; reduce su importancia media: ≈0,10 → ≈0,03<span style="color: rgba(255, 255, 255, 0.55);">.</span></strong></li>
+        <li class="reveal" data-delay="5">La distribución de puntos de race_White se comprime hacia cero en el modelo mitigado.</li>
+        <li class="reveal" data-delay="6">La lógica financiera del modelo se mantiene sin distorsión de las features económicas.</li>
+      </ul>
+      <div class="stat-row reveal" data-delay="7" style="margin-top:12px;">
+        <div class="stat-box"><div class="val">0.10</div><div class="lbl">SHAP race sesgado</div></div>
+        <div class="stat-box"><div class="val">0.03</div><div class="lbl">SHAP race mitigado</div></div>
+      </div>
+    </div>
+    <div class="right">
+      <div class="right-img">
+        <img src="outputs/images/shap_bar_comparativo.png" alt="SHAP Feature Importance comparativo sesgado vs mitigado">
+      </div>
+    </div>
+  </div>
+  <div class="shimmer-bar"></div>
+  <div class="slide-number"><span>14</span> / 16</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 15: CONCLUSIONES -->
+<!-- ============================================================ -->
+<section class="slide slide-dark visible" id="s15" aria-label="Conclusiones">
+  <div class="top-accent"></div>
+  <div class="slide-content">
+    <div class="kicker reveal">Síntesis</div>
+    <h2 class="slide-title reveal" data-delay="2">Conclusiones</h2>
+    <ul class="conc-list">
+      <li class="reveal" data-delay="3"><strong>El sesgo existe antes del modelo:</strong> las disparidades en los datos crudos HMDA NY 2024 anticipan los resultados de fairness de todos los clasificadores.</li>
+      <li class="reveal" data-delay="4"><strong>Alta capacidad no implica equidad:</strong> LightGBM alcanza ROC-AUC 0,8868 y sigue usando activamente la raza del solicitante (posición 8 en SHAP).</li>
+      <li class="reveal" data-delay="5"><strong>La mitigación funciona pero tiene coste:</strong> ExponentiatedGradient reduce la brecha racial 18,39→13,71 pp (−4,68 pp) a cambio de −10,6 pp en ROC-AUC.</li>
+      <li class="reveal" data-delay="6"><strong>SHAP valida la mitigación:</strong> derived_race_White baja de 0,10 a 0,03 sin distorsionar la lógica financiera dominante (debt_to_income_ratio).</li>
+      <li class="reveal" data-delay="7"><strong>Limitación clave:</strong> la restricción sobre raza no generaliza automáticamente a etnia ni a sexo — cada dimensión requiere su propia intervención.</li>
+    </ul>
+  </div>
+  <div class="slide-number"><span>15</span> / 16</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 16: CIERRE -->
+<!-- ============================================================ -->
+<section class="slide visible" id="s16" aria-label="Cierre">
+  <div class="split">
+    <div class="left">
+      <div class="kicker reveal">Trabajo futuro</div>
+      <h2 class="slide-title reveal" data-delay="2">Próximos pasos</h2>
+      <div class="divider reveal" data-delay="3"></div>
+      <ul class="check-list">
+        <li class="reveal" data-delay="3">Mitigación multi-atributo (raza + etnia + sexo simultáneamente).</li>
+        <li class="reveal" data-delay="4">Explorar técnicas de pre-procesamiento (re-muestreo equitativo) y post-procesamiento (calibración por grupos).</li>
+        <li class="reveal" data-delay="5">Aplicar a otros estados del dataset HMDA 2024 para generalizar hallazgos.</li>
+      </ul>
+    </div>
+    <div class="right">
+      <div class="right-close reveal-right">
+        <div class="close-box">
+          <div class="close-box-label">Autores</div>
+          <div class="close-box-val" style="font-size:var(--small-size);line-height:1.8;">
+            Izan Cuesta Corbí · Dennis García Solera<br>
+            Marcos Segurado Llopis · Jesús Cano Moya
+          </div>
+        </div>
+        <div class="close-box">
+          <div class="close-box-label">Asignatura</div>
+          <div class="close-box-val" style="font-size:var(--small-size);">Aprendizaje Avanzado · 2025/2026</div>
+        </div>
+        <div class="close-box">
+          <div class="close-box-label">Dataset</div>
+          <div class="close-box-val" style="font-size:var(--small-size);">HMDA New York 2024 — CFPB (ffiec.cfpb.gov)</div>
+        </div>
+        <div class="close-box">
+          <div class="close-box-label">Herramientas más relevantes</div>
+          <div class="close-box-val" style="font-size:var(--small-size);">Python · LightGBM · SHAP · Fairlearn · scikit-learn</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="shimmer-bar"></div>
+  <div class="slide-number"><span>16</span> / 16</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- JAVASCRIPT: Presentation Controller + Inline Editing -->
+<!-- ============================================================ -->
+<script>
+/* === SLIDE PRESENTATION CONTROLLER === */
+class SlidePresentation {
+  constructor() {
+    this.slides     = Array.from(document.querySelectorAll('.slide'));
+    this.totalSlides = this.slides.length;
+    this.current    = 0;
+
+    this.progressBar = document.getElementById('progressBar');
+    this.navDotsEl   = document.getElementById('navDots');
+
+    this.setupIntersectionObserver();
+    this.setupKeyboardNav();
+    this.setupTouchNav();
+    this.setupWheelNav();
+    this.buildNavDots();
+    this.updateProgress();
+  }
+
+  setupIntersectionObserver() {
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            this.current = this.slides.indexOf(entry.target);
+            this.updateProgress();
+            this.updateNavDots();
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
+    this.slides.forEach(s => io.observe(s));
+  }
+
+  goTo(index) {
+    if (index < 0 || index >= this.totalSlides) return;
+    this.slides[index].scrollIntoView({ behavior: 'smooth' });
+  }
+
+  setupKeyboardNav() {
+    document.addEventListener('keydown', e => {
+      if (e.target.getAttribute && e.target.getAttribute('contenteditable')) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        e.preventDefault(); this.goTo(this.current + 1);
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault(); this.goTo(this.current - 1);
+      } else if (e.key === 'Home') {
+        e.preventDefault(); this.goTo(0);
+      } else if (e.key === 'End') {
+        e.preventDefault(); this.goTo(this.totalSlides - 1);
+      }
+    });
+  }
+
+  setupTouchNav() {
+    let startY = 0, startX = 0;
+    document.addEventListener('touchstart', e => {
+      startY = e.touches[0].clientY;
+      startX = e.touches[0].clientX;
+    }, { passive: true });
+    document.addEventListener('touchend', e => {
+      const dy = startY - e.changedTouches[0].clientY;
+      const dx = startX - e.changedTouches[0].clientX;
+      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 50) {
+        dy > 0 ? this.goTo(this.current + 1) : this.goTo(this.current - 1);
+      }
+    }, { passive: true });
+  }
+
+  setupWheelNav() {
+    let lastWheel = 0;
+    document.addEventListener('wheel', e => {
+      const now = Date.now();
+      if (now - lastWheel < 800) return;
+      lastWheel = now;
+      e.deltaY > 0 ? this.goTo(this.current + 1) : this.goTo(this.current - 1);
+    }, { passive: true });
+  }
+
+  updateProgress() {
+    const pct = (this.current / (this.totalSlides - 1)) * 100;
+    this.progressBar.style.width = pct + '%';
+  }
+
+  buildNavDots() {
+    this.navDotsEl.innerHTML = '';
+    this.slides.forEach((_, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'nav-dot' + (i === 0 ? ' active' : '');
+      btn.setAttribute('aria-label', 'Ir a diapositiva ' + (i + 1));
+      btn.addEventListener('click', () => this.goTo(i));
+      this.navDotsEl.appendChild(btn);
+    });
+  }
+
+  updateNavDots() {
+    const dots = this.navDotsEl.querySelectorAll('.nav-dot');
+    dots.forEach((d, i) => d.classList.toggle('active', i === this.current));
+  }
+}
+
+/* === INLINE EDITOR === */
+class InlineEditor {
+  constructor() {
+    this.isActive   = false;
+    this.storageKey = 'hmda-slides-edit';
+    this.loadSaved();
+  }
+
+  toggleEditMode() {
+    this.isActive = !this.isActive;
+    document.body.classList.toggle('edit-active', this.isActive);
+    document.getElementById('editBanner').classList.toggle('active', this.isActive);
+    document.getElementById('editToggle').classList.toggle('active', this.isActive);
+
+    document.querySelectorAll(
+      '.slide-title, .kicker, .body-text, .agenda-label, .agenda-desc, .author, ' +
+      '.main-title, .main-metric-val, .main-metric-desc, .stat-box .val, .stat-box .lbl, ' +
+      '.close-box-val, ul.check-list li, .conc-list li, p'
+    ).forEach(el => {
+      if (this.isActive) {
+        el.setAttribute('contenteditable', 'true');
+        el.addEventListener('input', () => this.save());
+      } else {
+        el.removeAttribute('contenteditable');
+      }
+    });
+  }
+
+  save() {
+    const data = {};
+    document.querySelectorAll('[contenteditable]').forEach((el, i) => {
+      data[i] = el.innerHTML;
+    });
+    try { localStorage.setItem(this.storageKey, JSON.stringify(data)); } catch(e) {}
+  }
+
+  loadSaved() {
+    try {
+      const data = JSON.parse(localStorage.getItem(this.storageKey) || 'null');
+      if (!data) return;
+      const els = document.querySelectorAll(
+        '.slide-title, .kicker, .body-text, .agenda-label, .agenda-desc, .author, ' +
+        '.main-title, .main-metric-val, .main-metric-desc, .stat-box .val, .stat-box .lbl, ' +
+        '.close-box-val, ul.check-list li, .conc-list li, p'
+      );
+      els.forEach((el, i) => { if (data[i]) el.innerHTML = data[i]; });
+    } catch(e) {}
+  }
+
+  exportFile() {
+    // Strip edit state before capturing
+    const editables = Array.from(document.querySelectorAll('[contenteditable]'));
+    editables.forEach(el => el.removeAttribute('contenteditable'));
+    document.body.classList.remove('edit-active');
+    const toggle = document.getElementById('editToggle');
+    const banner = document.getElementById('editBanner');
+    toggle?.classList.remove('active','show');
+    banner?.classList.remove('active','show');
+
+    const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+
+    // Restore edit state
+    document.body.classList.add('edit-active');
+    editables.forEach(el => el.setAttribute('contenteditable','true'));
+    toggle?.classList.add('active');
+    banner?.classList.add('active');
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'hmda-presentacion.html';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+}
+
+/* === HOTZONE HOVER (JS-based, 400ms grace period) === */
+function setupHotzone() {
+  const hotzone = document.getElementById('editHotzone');
+  const toggle  = document.getElementById('editToggle');
+  let hideTimeout = null;
+
+  hotzone.addEventListener('mouseenter', () => {
+    clearTimeout(hideTimeout);
+    toggle.classList.add('show');
+  });
+  hotzone.addEventListener('mouseleave', () => {
+    hideTimeout = setTimeout(() => {
+      if (!editor.isActive) toggle.classList.remove('show');
+    }, 400);
+  });
+  toggle.addEventListener('mouseenter', () => clearTimeout(hideTimeout));
+  toggle.addEventListener('mouseleave', () => {
+    hideTimeout = setTimeout(() => {
+      if (!editor.isActive) toggle.classList.remove('show');
+    }, 400);
+  });
+  hotzone.addEventListener('click', () => editor.toggleEditMode());
+  toggle.addEventListener('click', () => editor.toggleEditMode());
+
+  document.addEventListener('keydown', e => {
+    if ((e.key === 'e' || e.key === 'E') && !e.target.getAttribute('contenteditable')) {
+      editor.toggleEditMode();
+    }
+  });
+}
+
+/* Ctrl+S to save */
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    if (editor.isActive) editor.exportFile();
+  }
+});
+
+/* === INIT === */
+const presentation = new SlidePresentation();
+const editor = new InlineEditor();
+setupHotzone();
+</script>
+
+
+</body></html>

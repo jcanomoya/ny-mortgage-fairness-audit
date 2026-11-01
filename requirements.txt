@@ -1,0 +1,23 @@
+# Data manipulation
+numpy
+pandas
+scipy
+
+# Visualización
+matplotlib
+seaborn
+Pillow
+
+# ML
+scikit-learn
+xgboost
+lightgbm
+
+# Explicabilidad
+shap
+
+# Fairness
+fairlearn
+
+# Gestión de modelos .pkl
+joblib
